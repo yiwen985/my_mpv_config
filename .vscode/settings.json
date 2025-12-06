@@ -1,0 +1,8 @@
+{
+    "Lua.diagnostics.globals": [
+        "mp"
+    ],
+    "Lua.diagnostics.disable": [
+        "deprecated"
+    ]
+}

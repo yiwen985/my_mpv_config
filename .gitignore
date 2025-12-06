@@ -1,0 +1,3 @@
+*.exe
+fonts.conf
+scripts/test.lua
