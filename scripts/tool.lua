@@ -39,28 +39,38 @@ function tool.readLines(filename)
     return lines
 end
 
-function tool.print_table(t)
-    local function pt(t)
-        if type(t) == "table" then
-            for k, v in pairs(t) do
-                if type(v) == "table" then
-                    print(k .. ":")
-                    pt(v)
-                else
-                    print(k .. ": " .. tostring(v))
-                end
-            end
+function tool.to_string(table)
+    if not table then
+        return "nil"
+    end
+    local t_type = type(table)
+    if t_type ~= "table" then
+        if t_type == "string" then
+            return string.format("%q", table)
         else
-            print(tostring(t))
+            return tostring(table)
         end
     end
 
-    -- if not prompt then
-    --     prompt = ""
-    -- end
-    print("----- Start ------")
-    pt(t)
-    print("-----  END  ------")
+    local res = "{"
+    local len = 0
+    for _ in pairs(table) do -- #{name="bob"}  == 0
+        len = len + 1
+    end
+
+    for key, value in pairs(table) do
+        -- key 只有 string 和 number
+        if type(key) == "string" then
+            res = res .. key .. " = "
+        end
+
+        res = res .. tool.to_string(value)
+
+        len = len - 1
+        res = res .. ((len == 0) and "" or ", ")
+    end
+    res = res .. "}"
+    return res
 end
 
 --- return { title = title, time = time } or { title = "", time = 0 }
@@ -92,56 +102,7 @@ function tool.is_absolute(path)
 end
 
 -- https://github.com/mpv-player/mpv/blob/dbd7a905b6ed47dd8f0acd09a1f4cc9a08e854a6/player/lua/defaults.lua#L725
-function tool.format_table(t, set)
-    if not set then
-        set = { [t] = true }
-    end
-    local res = "{"
-    -- pretty expensive but simple way to distinguish array and map parts of t
-    local keys = {}
-    local vals = {}
-    local arr = 0
-    for i = 1, #t do
-        if t[i] == nil then
-            break
-        end
-        keys[i] = i
-        vals[i] = t[i]
-        arr = i
-    end
-    for k, v in pairs(t) do
-        if not (type(k) == "number" and k >= 1 and k <= arr and keys[k]) then
-            keys[#keys + 1] = k
-            vals[#keys] = v
-        end
-    end
-    for i = 1, #keys do
-        if #res > 1 then
-            res = res .. ", "
-        end
-        if i > arr then
-            res = res .. tool.to_string(keys[i], set) .. " = "
-        end
-        res = res .. tool.to_string(vals[i], set)
-    end
-    res = res .. "}"
-    return res
-end
+-- function to_string
 
-function tool.to_string(v, set)
-    if type(v) == "string" then
-        return "\"" .. v .. "\""
-    elseif type(v) == "table" then
-        if set then
-            if set[v] then
-                return "[cycle]"
-            end
-            set[v] = true
-        end
-        return tool.format_table(v, set)
-    else
-        return tostring(v)
-    end
-end
 
 return tool
