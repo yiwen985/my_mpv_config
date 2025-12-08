@@ -39,37 +39,27 @@ function tool.readLines(filename)
     return lines
 end
 
-function tool.to_string(table)
-    if not table then
-        return "nil"
-    end
-    local t_type = type(table)
-    if t_type ~= "table" then
-        if t_type == "string" then
-            return string.format("%q", table)
+function tool.to_string(t)
+    local first = true
+    local res = ""
+    for k, v in pairs(t) do
+        if not first then
+            res = res .. ", "
+        end
+        first = false
+
+        if type(k) == "string" then
+            res = res .. k .. " = "
+        end
+
+        if type(v) == "table" then
+            res = res .. "{" .. tool.to_string(v) .. "}"
+        elseif type(v) == "string" then
+            res = res .. string.format("%q", v)
         else
-            return tostring(table)
+            res = res .. tostring(v)
         end
     end
-
-    local res = "{"
-    local len = 0
-    for _ in pairs(table) do -- #{name="bob"}  == 0
-        len = len + 1
-    end
-
-    for key, value in pairs(table) do
-        -- key 只有 string 和 number
-        if type(key) == "string" then
-            res = res .. key .. " = "
-        end
-
-        res = res .. tool.to_string(value)
-
-        len = len - 1
-        res = res .. ((len == 0) and "" or ", ")
-    end
-    res = res .. "}"
     return res
 end
 

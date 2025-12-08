@@ -66,6 +66,9 @@ local function bookmark_add()
         prompt = "添加书签（时间 标题）: ",
         submit = function(text)
             local line = tool.trim(text)
+            if line == "" then
+                return
+            end
             local item = tool.parse_line(line)
             if item then
                 table.insert(chapters, item)
@@ -119,12 +122,18 @@ local function bookmark_remove(remember_pos)
 end
 
 
-local function bookmark_modify()
+local function bookmark_modify(default_index)
     if not next(chapters) then
         mp.osd_message("No available chapters.")
         return
     end
-    local default_item = mp.get_property_native("chapter")
+    local default_item
+    if default_index then
+        default_item = default_index
+    else
+        default_item = mp.get_property_native("chapter")
+        default_item = default_item > -1 and default_item + 1
+    end
 
     local chps = {}
     for i, item in ipairs(chapters) do
@@ -134,7 +143,7 @@ local function bookmark_modify()
     input.select({
         prompt = "修改书签:",
         items = chps,
-        default_item = default_item > -1 and default_item + 1,
+        default_item = default_item,
         submit = function(option_num)
             -- print("option_num " .. option_num) -- 没有这行，下方无法打印 text
             mp.add_timeout(0.01, function() -- 确保 mpv 有时间处理上一个菜单的关闭，并准备好显示新菜单. 0.01 比 0 好，这样可以注释上面一行
@@ -143,6 +152,14 @@ local function bookmark_modify()
                     submit = function(text)
                         print(text)
                         local line = tool.trim(text)
+                        if line == "" then
+                            table.remove(chapters, option_num)
+                            updateChapterList()
+                            mp.add_timeout(0, function()
+                                bookmark_modify(option_num)
+                            end)
+                            return
+                        end
                         local item = tool.parse_line(line)
                         local _, original_item = next(chapters, option_num)
                         if original_item and original_item.time == item.time then
@@ -158,7 +175,9 @@ local function bookmark_modify()
                         end
                         updateChapterList()
 
-                        mp.add_timeout(0, bookmark_modify)
+                        mp.add_timeout(0, function()
+                            bookmark_modify(option_num)
+                        end)
                     end,
                     default_text = chps[option_num] .. " "
                 })
@@ -219,6 +238,11 @@ local function bookmark_add_append()
         prompt = "添加加书签（时间 标题）: ",
         submit = function(text)
             local line = tool.trim(text)
+            if line == "" then
+                table.remove(chapters, pos)
+                updateChapterList()
+                return
+            end
             local item = tool.parse_line(line)
             if item then
                 table.remove(chapters, pos)
@@ -265,3 +289,25 @@ mp.add_key_binding("shift+p", "bookmark_add_append", bookmark_add_append)
 mp.add_key_binding("del", "bookmark_remove", bookmark_remove)
 mp.add_key_binding("w", "bookmark_modify", bookmark_modify)
 mp.add_key_binding("alt+n", "jump_to_chapter_end", jump_to_chapter_end)
+mp.add_key_binding("ctrl+y", "copy_chapters", function()
+    if not next(chapters) then
+        mp.osd_message("No available chapters.")
+        return
+    end
+
+    local lines = ""
+    local file = io.open(currChapterFile(), "r")
+    if file then
+        for line in file:lines() do
+            if line:match("%S") then -- 只包含非空白字符的行才加入
+                lines = lines .. line .. "\n"
+            end
+        end
+        file:close()
+    else
+        mp.osd_message("No chapters file.")
+        return
+    end
+    print("lines:" .. lines)
+    mp.command("set clipboard/text '" .. tool.trim(lines) .. "'")
+end)
