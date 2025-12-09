@@ -53,10 +53,39 @@ local function loadChapterFromFile()
     end
 end
 
+--- @param t table
+--- @return table
+local function removeDuplicates(t)
+    -- 正确排序 chapters（假设 chapters 是一个全局 table）
+    table.sort(chapters, function(a, b)
+        return a.time < b.time
+    end)
+
+    local res = {}
+    local last = nil
+
+    for _, item in ipairs(t) do
+        if not last then
+            table.insert(res, item)
+        else
+            if last.time == item.time and last.title == item.title then
+                -- 跳过重复项
+            else
+                table.insert(res, item)
+            end
+        end
+
+        last = item
+    end
+
+    return res
+end
+
 local function loadChapter(event)
     chapters = {}
     loadChapterFromVideo()
     loadChapterFromFile()
+    chapters = removeDuplicates(chapters)
     updateChapterList()
 end
 
