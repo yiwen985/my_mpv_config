@@ -16,10 +16,13 @@ function tool.format_time(seconds)
 end
 
 function tool.timestamp_to_number(timestamp)
+    if not timestamp then
+        return -1
+    end
     local seconds = 0.0
     for part in timestamp:gmatch("[^:]+") do
         local p = tonumber(part)
-        if not p then return 0 end
+        if not p then return -1 end
         seconds = seconds * 60 + p
     end
     return seconds
@@ -71,11 +74,12 @@ end
 function tool.parse_line(line)
     -- 以第一个空格为分界
     local time, title = tool.trim(line):match("^(%S+)%s*(.*)$")
-    -- if time and title then -- (time and title) = if time then return title else return false end
-    if time then
-        return { title = tool.trim(title), time = tool.timestamp_to_number(time) }
+    time = tool.timestamp_to_number(time)
+    if time >= 0 then
+        return { title = tool.trim(title), time = time }
     else
-        return { title = "", time = 0 }
+        -- return { title = "", time = 0 }
+        return { title = tool.trim(line), time = -1 }
     end
 end
 
@@ -94,5 +98,37 @@ end
 -- https://github.com/mpv-player/mpv/blob/dbd7a905b6ed47dd8f0acd09a1f4cc9a08e854a6/player/lua/defaults.lua#L725
 -- function to_string
 
+--- return mp4
+--- no point
+function tool.getExtension(filename)
+    local ext = filename:match("%.([^%./]+)$")
+    return ext or ""
+end
+
+-- 如果文件存在，自动附加 (1), (2), (3)...
+function tool.unique_filename(base)
+    local name = base
+    local count = 1
+    local ext = ""
+    local prefix = base
+
+    -- 分离扩展名
+    local idx = base:match("^.*()%.")
+    if idx then
+        prefix = base:sub(1, idx - 1)
+        ext = base:sub(idx)
+    end
+
+    while tool.file_exists(name) do
+        name = string.format("%s (%d)%s", prefix, count, ext)
+        count = count + 1
+    end
+    return name
+end
+
+function tool.file_exists(name)
+    local f = io.open(name, "r")
+    return f ~= nil and io.close(f)
+end
 
 return tool

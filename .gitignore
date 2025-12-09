@@ -1,3 +1,4 @@
 *.exe
 fonts.conf
 scripts/test.lua
+.vscode/settings.json

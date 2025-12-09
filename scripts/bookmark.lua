@@ -68,7 +68,7 @@ local function removeDuplicates(t)
         if not last then
             table.insert(res, item)
         else
-            if last.time == item.time and last.title == item.title then
+            if tool.format_time(last.time) == tool.format_time(item.time) and last.title == item.title then
                 -- 跳过重复项
             else
                 table.insert(res, item)
@@ -303,12 +303,73 @@ local function jump_to_chapter_end()
     local curr_chapter = chapters[pos]
     local time = tool.parse_line(curr_chapter.title).time
 
-    if time then
+    if time >= 0 then
         mp.commandv("set", "time-pos", time)
         return
     end
 
     mp.command("add chapter 1")
+end
+
+--- alt+x
+--- dump-cache <start> <end> <filename>
+--- ffmpeg -i video -ss start_time -to end_time -c:a copy -y output
+local function bookmark_cut(dir)
+    if not next(chapters) then
+        mp.osd_message("No available chapters. Can't cut.")
+        return
+    end
+    if not dir then
+        dir = "clips"
+    end
+    local video = mp.get_property("path")
+    -- local ext = tool.getExtension(video)
+    local ext = "mp4"
+    local parent, _ = utils.split_path(video)
+    dir = utils.join_path(parent, dir)
+    local pos = (mp.get_property_number("chapter") or -1) + 1
+
+    -- 开始时间 结束时间（取标题的 或到下一章节开始 或视频结束） title（没有就默认 chapter num)
+    local chapter_start, chapter_end, chapter_title
+    if pos == 0 then
+        chapter_start = "0"
+        chapter_end = tostring(chapters[1].time)
+        chapter_title = "chapter 0"
+    else
+        chapter_start = tool.format_time(chapters[pos].time)
+        local parse_title = tool.parse_line(chapters[pos].title)
+        if parse_title.time >= 0 then
+            chapter_end = parse_title.time
+        else
+            chapter_end = chapters[pos + 1] and chapters[pos + 1].time or mp.get_property_number("duration/full")
+        end
+        chapter_end = tostring(chapter_end)
+        chapter_title = (parse_title.title == "") and ("chapter " .. pos) or parse_title.title
+    end
+
+    os.execute("mkdir -p " .. dir)
+    local output_file = utils.join_path(dir, chapter_title .. "." .. ext)
+    output_file = tool.unique_filename(output_file)
+    local command = { 'ffmpeg', '-i', video, '-ss', chapter_start, '-to', chapter_end, '-c:a', 'copy', '-y', output_file }
+    mp.msg.info("Executing FFmpeg command: " .. table.concat(command, " "))
+    mp.command_native_async({
+        name = "subprocess",
+        args = command,
+        capture_stdout = true, -- 捕获标准输出（可选）
+        capture_stderr = true, -- 捕获标准错误输出（可选）
+    }, function(success, result)
+        -- 回调函数：处理命令执行结果
+        if success and result.status == 0 then
+            mp.osd_message("FFmpeg 命令执行成功！文件保存至: " .. output_file, 5)
+            mp.msg.info("FFmpeg 命令执行成功！文件保存至: " .. output_file)
+        else
+            mp.osd_message("FFmpeg 命令执行失败！", 5)
+            mp.msg.warn("FFmpeg error: Status " .. tostring(result.status or "nil"))
+            if result.stderr then
+                mp.msg.warn("FFmpeg STDERR: " .. result.stderr)
+            end
+        end
+    end)
 end
 
 mp.register_event("file-loaded", loadChapter)
@@ -340,3 +401,5 @@ mp.add_key_binding("ctrl+y", "copy_chapters", function()
     print("lines:" .. lines)
     mp.command("set clipboard/text '" .. tool.trim(lines) .. "'")
 end)
+
+mp.add_key_binding("alt+x", "bookmark_cut", bookmark_cut)
