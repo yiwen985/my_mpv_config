@@ -15,19 +15,20 @@ function tool.format_time(seconds)
     return string.format("%02d:%02d:%02d.%03d", h, m, s, ms)
 end
 
+---时间格式转换成小数。例如 00:01:00.123 -> 60.123, 01:00.123 -> 60.123
+---@param timestamp string
+---@return number? # 返回小数，不是时间格式返回 nil
 function tool.timestamp_to_number(timestamp)
-    if not timestamp then
-        return -1
-    end
     local seconds = 0.0
     for part in timestamp:gmatch("[^:]+") do
         local p = tonumber(part)
-        if not p then return -1 end
+        if not p then return nil end
         seconds = seconds * 60 + p
     end
     return seconds
 end
 
+--- @return table? # 返回 lines，文件不存在返回 nil
 function tool.readLines(filename)
     local lines = {}
     local file = io.open(filename, "r")
@@ -38,11 +39,17 @@ function tool.readLines(filename)
             end
         end
         file:close()
+    else
+        return nil
     end
     return lines
 end
 
 function tool.to_string(t)
+    if type(t) ~= "table" then
+        return tostring(t)
+    end
+
     local first = true
     local res = ""
     for k, v in pairs(t) do
@@ -56,36 +63,21 @@ function tool.to_string(t)
         end
 
         if type(v) == "table" then
-            res = res .. "{" .. tool.to_string(v) .. "}"
+            -- res = res .. "{" .. tool.to_string(v) .. "}"
+            res = res .. tool.to_string(v)
         elseif type(v) == "string" then
             res = res .. string.format("%q", v)
         else
             res = res .. tostring(v)
         end
     end
-    return res
+    return "{" .. res .. "}"
 end
 
---- return { title = title, time = time } or { title = "", time = 0 }
---- 以不是开头的第一个空格部分为分界，分为 time 和 title
---- 必须有 time
----
---- @param line string
-function tool.parse_line(line)
-    -- 以第一个空格为分界
-    local time, title = tool.trim(line):match("^(%S+)%s*(.*)$")
-    time = tool.timestamp_to_number(time)
-    if time >= 0 then
-        return { title = tool.trim(title), time = time }
-    else
-        -- return { title = "", time = 0 }
-        return { title = tool.trim(line), time = -1 }
-    end
-end
-
+--- \\\\ 开头 == true
 function tool.is_local_file(path)
-    -- 判断是否 NOT 以某种协议开头
-    return (path and not path:match("^%a[%w+.-]*://")) or false
+    -- 是否以某种协议开头
+    return path and (not path:match("^%a[%w+.-]*://"))
 end
 
 function tool.is_absolute(path)
@@ -112,7 +104,7 @@ function tool.unique_filename(base)
     local ext = ""
     local prefix = base
 
-    -- 分离扩展名
+    -- 分离扩展名tostring
     local idx = base:match("^.*()%.")
     if idx then
         prefix = base:sub(1, idx - 1)
@@ -126,9 +118,32 @@ function tool.unique_filename(base)
     return name
 end
 
+--- 或使用 if not mp.utils.file_info(clips_dir) then print("file not exists.") end
 function tool.file_exists(name)
     local f = io.open(name, "r")
     return f ~= nil and io.close(f)
+end
+
+--- 去除 table 中的重复项（保持顺序）
+--- @param t table 原始列表
+--- @return table # 去重后的新列表
+function tool.table_unique(t)
+    local check = {}
+    local n = {}
+    for _, v in ipairs(t) do
+        if not check[v] then
+            n[#n + 1] = v
+            check[v] = true
+        end
+    end
+    return n
+end
+
+-- 使用string.match获取文件名部分
+function tool.get_filestem(filepath)
+    local name = filepath:match("([^/\\]+)$") -- 获取文件名部分
+    local stem = name:match("^(.+)%.[^.]*$")  -- 去掉扩展名
+    return stem or name
 end
 
 return tool

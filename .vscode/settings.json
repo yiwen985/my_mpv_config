@@ -4,5 +4,6 @@
     ],
     "Lua.diagnostics.disable": [
         "deprecated"
-    ]
+    ],
+    "vscodemacros.macroFilePath": "\\\\DESKTOP-VV2JEB7\\bililiverecorder\\bin\\vscode_macro.js"
 }
