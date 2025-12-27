@@ -312,7 +312,7 @@ local function bookmark_modify(remember_pos)
                             bookmark_modify(option_num)
                         end)
                     end,
-                    default_text = chps[option_num] .. " "
+                    default_text = chps[option_num]
                 })
             end)
         end
