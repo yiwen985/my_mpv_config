@@ -399,6 +399,7 @@ local function ffmpeg_cut(video_path, start_time, end_time, out_path, title)
         return
     end
 
+    out_path = tool.unique_filename(out_path)
     title = title or tool.get_filestem(out_path)
     local command = { 'ffmpeg', '-ss', start_time, '-to', end_time, '-i', video_path, '-c:a', 'copy',
         '-metadata', string.format("title=%q", title), '-y', out_path }
@@ -461,7 +462,31 @@ local function bookmark_cut(remember_pos)
     })
 end
 
-mp.add_key_binding("ctrl+z", "test_bookmark", has_ffmpeg)
+local function cut_ab_loop()
+    local ab_loop_a = mp.get_property("ab-loop-a")
+    local ab_loop_b = mp.get_property("ab-loop-b")
+    if not ab_loop_a or not ab_loop_b then
+        mp.osd_message("没有设置 ab-loop-a 或 ab-loop-b")
+        return
+    end
+    -- print(ab_loop_a, ab_loop_b)
+    -- print(type(ab_loop_a))
+
+    local ext = "mp4"
+    local clips_dir_name = "切片"
+    local title = "片段"
+
+    local video_path = get_file_path()
+    local parent, _ = utils.split_path(video_path)
+    local clips_dir = utils.join_path(parent, clips_dir_name)
+    if not utils.file_info(clips_dir) then
+        os.execute("mkdir -p " .. clips_dir)
+    end
+    local out_path = utils.join_path(clips_dir, title .. "." .. ext)
+    ffmpeg_cut(video_path, ab_loop_a, ab_loop_b, out_path, title)
+end
+
+-- mp.add_key_binding("ctrl+z", "test_bookmark", has_ffmpeg)
 mp.register_event("file-loaded", load_chapter_file)
 mp.add_key_binding(nil, "bookmark_select", bookmark_select)
 mp.add_key_binding(nil, "bookmark_add", bookmark_add)
@@ -472,3 +497,4 @@ mp.add_key_binding(nil, "bookmark_modify", bookmark_modify)
 mp.add_key_binding(nil, "copy_chapters", copy_chapters)
 mp.add_key_binding(nil, "copy_chapter", copy_chapter)
 mp.add_key_binding(nil, "bookmark_cut", bookmark_cut)
+mp.add_key_binding(nil, "cut_ab_loop", cut_ab_loop)
