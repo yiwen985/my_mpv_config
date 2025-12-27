@@ -345,7 +345,6 @@ end
 
 
 
---- ```
 --- callback(result)
 ---     if result.status == 0 then
 ---         print("命令运行成功：" .. tool.to_string(command))
@@ -354,10 +353,9 @@ end
 ---         print("命令运行失败：" .. result.stderr)
 ---     end
 --- end
---- ```
 ---
 ---@param command table
----@param callback function|nil #
+---@param callback function? # callback(result)
 local function run_command(command, callback)
     if type(command) ~= "table" then
         mp.msg.error("command is not table.")
@@ -394,6 +392,7 @@ end
 ---@param start_time string
 ---@param end_time string
 ---@param out_path string
+---@param title string?
 local function ffmpeg_cut(video_path, start_time, end_time, out_path, title)
     if not video_path or not start_time or not end_time or not out_path then
         mp.msg.error("ffmpeg_cut(video_path, start_time, end_time, out_path) 参数需要非空")
@@ -405,10 +404,11 @@ local function ffmpeg_cut(video_path, start_time, end_time, out_path, title)
         '-metadata', string.format("title=%q", title), '-y', out_path }
     run_command(command, function(result)
         if result.status == 0 then
-            print("完成 " .. out_path)
-            mp.osd_message("完成 " .. out_path)
+            mp.msg.info("完成 " .. out_path)
+            mp.osd_message("完成 " .. out_path, 2)
         else
-            print("命令运行失败：" .. result.stderr)
+            mp.osd_message("命令运行失败，未安装 ffmpeg 或发生其他错误，按 ` 查看错误输出", 10)
+            mp.msg.error("命令运行失败：" .. tool.to_string(result))
         end
     end)
 end
@@ -452,9 +452,7 @@ local function bookmark_cut(remember_pos)
             end
             local out_path = utils.join_path(clips_dir, title .. "." .. ext)
 
-            mp.add_timeout(0, function()
-                ffmpeg_cut(video_path, start_time, end_time, out_path, title)
-            end)
+            ffmpeg_cut(video_path, start_time, end_time, out_path, title)
 
             mp.add_timeout(0.1, function()
                 bookmark_cut(chapter_num)
