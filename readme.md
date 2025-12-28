@@ -51,9 +51,15 @@ see `input.conf` `# bookmark 书签`
 1. 安装 mpv
 2. 设置环境变量
 
-    e.g. MPV_HOME=D:\program\mpv-x86_64-v3-20251130-git-23f9381\mpv
+    例如：MPV_HOME=D:\program\mpv-x86_64-v3-20251130-git-23f9381\mpv
 
 3. 放入文件
+
+## 依赖
+
+```shell
+winget install -e --id yt-dlp.yt-dlp
+```
 
 debug
 

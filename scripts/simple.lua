@@ -31,7 +31,7 @@ local function set_screenshot_directory()
     local path = mp.get_property("screenshot-directory") or "~/Pictures/mpv-screenshot"
     local video = mp.get_property("path")
     local dir, _ = utils.split_path(video)
-    dir = tool.is_local_file(video) and dir or "~/Pictures"
+    dir = tool.is_local_path(video) and dir or "~/Pictures"
     path = utils.join_path(dir, path)
     mp.set_property("screenshot-directory", path)
 end

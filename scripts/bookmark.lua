@@ -10,8 +10,63 @@ local function get_file_path()
     return mp.get_property("path")
 end
 
+---@param no_ext boolean?
+---@return string filename
+local function get_file_name(no_ext)
+    return no_ext and mp.get_property("filename/no-ext") or mp.get_property("filename")
+end
+
+local function get_title()
+    return mp.get_property("media-title")
+end
+
+---write for net_video
+local function get_video_dir()
+    local default_dir = "~/Videos/mpv"
+    local video_path = get_file_path()
+    local dir = tool.is_local_path(video_path) and utils.split_path(video_path) or
+        utils.join_path(default_dir, get_title())
+    dir = mp.command_native({ "expand-path", dir })
+    return dir
+end
+
+---@param file_path string
+---@return boolean
+local function file_exists(file_path)
+    return utils.file_info(file_path) and true
+end
+
+---mkdir(nil)      -> 视频文件夹
+---mkdir(rel_path) -> join_path(视频文件夹,rel_path)
+---mkdir(abs_path) -> abs_path
+---
+---视频文件夹
+---    本地视频文件夹 utils.split_path(video_path)
+---    网络视频文件夹 "~/Videos/mpv/${video-title}/"
+---
+---支持 "~/Videos/mpv-chapters"
+---@param dir string? # 相对路径, 绝对路径, nil
+---@return string # 返回创建的文件夹路径
+local function mkdir(dir)
+    local video_dir = get_video_dir()
+
+    if not dir then
+        dir = video_dir
+    elseif not tool.is_absolute(dir) then
+        dir = utils.join_path(video_dir, dir)
+    end
+
+    if not file_exists(dir) then
+        os.execute("mkdir " .. tool.escape_str(dir))
+    end
+    return dir
+end
+
 local function get_chapter_file_path()
-    return get_file_path() .. ".chapters.txt"
+    local ext = ".chapters.txt"
+    local parent_dir = get_video_dir()
+    local chapter_file_name = tool.is_local_path(get_file_path()) and get_file_name() or get_title()
+    return utils.join_path(parent_dir, chapter_file_name .. ext)
 end
 
 --- @return table? chapters # 返回 chapters，如果是空的，返回 nil
@@ -105,6 +160,7 @@ local function parse_chapter(chapter)
 end
 
 local function write_chapters_to_chapter_file()
+    mkdir()
     local plain_text = get_chapters_plain_text()
     local chapter_file_path = get_chapter_file_path()
 
@@ -118,7 +174,7 @@ local function write_chapters_to_chapter_file()
         chapter_file:write(plain_text)
         chapter_file:close()
     else
-        mp.msg.error("无法打开文件: " .. chapter_file)
+        mp.msg.error("无法打开文件: " .. chapter_file_path)
     end
 end
 
@@ -388,6 +444,7 @@ local function has_ffmpeg()
     run_command(command)
 end
 
+---不覆盖原文件
 ---@param video_path string
 ---@param start_time string
 ---@param end_time string
@@ -403,6 +460,8 @@ local function ffmpeg_cut(video_path, start_time, end_time, out_path, title)
     title = title or tool.get_filestem(out_path)
     local command = { 'ffmpeg', '-ss', start_time, '-to', end_time, '-i', video_path, '-c:a', 'copy',
         '-metadata', string.format("title=%q", title), '-y', out_path }
+
+    mp.osd_message("开始切片 " .. out_path, 2)
     run_command(command, function(result)
         if result.status == 0 then
             mp.msg.info("完成 " .. out_path)
@@ -414,8 +473,30 @@ local function ffmpeg_cut(video_path, start_time, end_time, out_path, title)
     end)
 end
 
+---不覆盖原文件
+local function ytdlp_cut(video_path, start_time, end_time, out_path, title)
+    if not video_path or not start_time or not end_time or not out_path then
+        mp.msg.error("ffmpeg_cut(video_path, start_time, end_time, out_path) 参数需要非空")
+        return
+    end
+    out_path = tool.unique_filename(out_path)
+    title = title or tool.get_filestem(out_path)
+    local command = { 'yt-dlp', '--download-sections', string.format("*%s-%s", start_time, end_time), '-o', out_path,
+        video_path }
+    mp.osd_message("开始切片 " .. out_path, 2)
+    run_command(command, function(result)
+        if result.status == 0 then
+            mp.msg.info("完成 " .. out_path)
+            mp.osd_message("完成 " .. out_path, 2)
+        else
+            mp.osd_message("命令运行失败，未安装 ytdlp 或发生其他错误，按 ` 查看错误输出", 10)
+            mp.msg.error("命令运行失败：" .. tool.to_string(result))
+        end
+    end)
+end
+
+
 --- 选择一个章节切出来
---- TODO?：dump-cache <start> <end> <filename>
 local function bookmark_cut(remember_pos)
     local chapters = get_chapter_list()
     if not chapters then
@@ -425,7 +506,6 @@ local function bookmark_cut(remember_pos)
 
     -- local ext = tool.getExtension(video)
     local ext = "mp4"
-    local clips_dir_name = "切片"
 
     local default_item = remember_pos or get_current_chapter_pos_of_chapters() or 1
     local chps = {}
@@ -446,14 +526,14 @@ local function bookmark_cut(remember_pos)
             end
 
             local video_path = get_file_path()
-            local parent, _ = utils.split_path(video_path)
-            local clips_dir = utils.join_path(parent, clips_dir_name)
-            if not utils.file_info(clips_dir) then
-                os.execute("mkdir -p " .. clips_dir)
-            end
+            local clips_dir = mkdir("切片")
             local out_path = utils.join_path(clips_dir, title .. "." .. ext)
 
-            ffmpeg_cut(video_path, start_time, end_time, out_path, title)
+            if tool.is_local_path(video_path) then
+                ffmpeg_cut(video_path, start_time, end_time, out_path, title)
+            else
+                ytdlp_cut(video_path, start_time, end_time, out_path, title)
+            end
 
             mp.add_timeout(0.1, function()
                 bookmark_cut(chapter_num)
@@ -469,24 +549,24 @@ local function cut_ab_loop()
         mp.osd_message("没有设置 ab-loop-a 或 ab-loop-b")
         return
     end
-    -- print(ab_loop_a, ab_loop_b)
-    -- print(type(ab_loop_a))
 
     local ext = "mp4"
-    local clips_dir_name = "切片"
+    local clips_dir = mkdir("切片")
     local title = "片段"
 
     local video_path = get_file_path()
-    local parent, _ = utils.split_path(video_path)
-    local clips_dir = utils.join_path(parent, clips_dir_name)
-    if not utils.file_info(clips_dir) then
-        os.execute("mkdir -p " .. clips_dir)
-    end
+
     local out_path = utils.join_path(clips_dir, title .. "." .. ext)
-    ffmpeg_cut(video_path, ab_loop_a, ab_loop_b, out_path, title)
+    if tool.is_local_path(video_path) then
+        ffmpeg_cut(video_path, ab_loop_a, ab_loop_b, out_path, title)
+    else
+        ytdlp_cut(video_path, ab_loop_a, ab_loop_b, out_path, title)
+    end
 end
 
--- mp.add_key_binding("ctrl+z", "test_bookmark", has_ffmpeg)
+mp.add_key_binding("ctrl+z", "test_bookmark", function()
+    print(get_chapter_file_path())
+end)
 mp.register_event("file-loaded", load_chapter_file)
 mp.add_key_binding(nil, "bookmark_select", bookmark_select)
 mp.add_key_binding(nil, "bookmark_add", bookmark_add)

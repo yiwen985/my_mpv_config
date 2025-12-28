@@ -75,16 +75,15 @@ function tool.to_string(t)
 end
 
 --- \\\\ 开头 == true
-function tool.is_local_file(path)
+function tool.is_local_path(path)
     -- 是否以某种协议开头
     return path and (not path:match("^%a[%w+.-]*://"))
 end
 
 function tool.is_absolute(path)
-    if not path then
-        return false
-    end
-    return path:match("^%a:[/\\]") or path:match("^\\\\") or (path:sub(1, 1) == "/") or (path:sub(1, 1) == "~")
+    local res = path and path:match("^%a:[/\\]") or path:match("^\\\\") or (path:sub(1, 1) == "/") or
+        (path:sub(1, 1) == "~")
+    return res and true
 end
 
 -- https://github.com/mpv-player/mpv/blob/dbd7a905b6ed47dd8f0acd09a1f4cc9a08e854a6/player/lua/defaults.lua#L725
@@ -144,6 +143,10 @@ function tool.get_filestem(filepath)
     local name = filepath:match("([^/\\]+)$") -- 获取文件名部分
     local stem = name:match("^(.+)%.[^.]*$")  -- 去掉扩展名
     return stem or name
+end
+
+function tool.escape_str(str)
+    return string.format("%q", str)
 end
 
 return tool
