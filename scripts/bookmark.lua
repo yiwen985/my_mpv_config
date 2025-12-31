@@ -230,6 +230,7 @@ local function bookmark_select()
     })
 end
 
+--- BUG：纯数字标题可能会被 bookmark_add_append 识别成章节结束时间
 local function bookmark_add()
     local default_text = get_current_timestamp() .. " "
     local chapters = get_chapter_list() or {}
@@ -252,10 +253,13 @@ local function bookmark_add_append()
     local chapters = get_chapter_list()
     local pos = get_current_chapter_pos_of_chapters()
     if not chapters or not pos then
-        mp.add_timeout(0.1, bookmark_add)
+        mp.add_timeout(0.01, bookmark_add)
         return
     end
 
+    if not chapters[pos] then
+        return
+    end
     local start_time, _, chapter_title = parse_chapter(chapters[pos])
     local default_text = start_time .. " " .. get_current_timestamp() .. " " .. chapter_title
 
@@ -286,6 +290,9 @@ local function jump_to_chapter_end()
         return
     end
 
+    if not chapters[pos] then
+        return
+    end
     local _, end_time, _ = parse_chapter(chapters[pos])
     if end_time then
         mp.set_property("time-pos", end_time)
@@ -321,7 +328,7 @@ local function bookmark_remove(remember_pos)
             update_chapters(chapters)
             local pos = math.min(option_num, #chapters)
             -- mp.add_timeout(0, testLoop) 会将 bookmark_remove() 推入事件队列，确保 mpv 有时间处理上一个菜单的关闭，并准备好显示新菜单。
-            mp.add_timeout(0.1, function()
+            mp.add_timeout(0.01, function()
                 bookmark_remove(pos)
             end)
         end
@@ -352,8 +359,15 @@ local function bookmark_modify(remember_pos)
                 return
             end
 
+            local chapter = chapters[option_num]
+            if not chapter then
+                return
+            end
+            local _, _, chapter_title = parse_chapter(chapter)
+            local default_text = chps[option_num] .. ((chapter_title == "") and " " or "")
+
             -- print("option_num " .. option_num) -- 没有这行，下方无法打印 text
-            mp.add_timeout(0.1, function() -- 确保 mpv 有时间处理上一个菜单的关闭，并准备好显示新菜单. 0.01 比 0 好，这样可以注释上面一行
+            mp.add_timeout(0.01, function() -- 确保 mpv 有时间处理上一个菜单的关闭，并准备好显示新菜单. 0.01 比 0 好，这样可以注释上面一行
                 input.get({
                     prompt = "修改书签（时间 标题）:",
                     submit = function(text)
@@ -364,11 +378,12 @@ local function bookmark_modify(remember_pos)
                             update_chapters(chapters)
                         end
 
-                        mp.add_timeout(0.1, function()
+                        mp.add_timeout(0.01, function()
                             bookmark_modify(option_num)
                         end)
                     end,
-                    default_text = chps[option_num]
+                    -- default_text = chps[option_num]
+                    default_text = default_text
                 })
             end)
         end
@@ -458,7 +473,7 @@ local function ffmpeg_cut(video_path, start_time, end_time, out_path, title)
 
     out_path = tool.unique_filename(out_path)
     title = title or tool.get_filestem(out_path)
-    local command = { 'ffmpeg', '-ss', start_time, '-to', end_time, '-i', video_path, '-c:a', 'copy',
+    local command = { 'ffmpeg', '-v', 'error', '-ss', start_time, '-to', end_time, '-i', video_path, '-c:a', 'copy',
         '-metadata', string.format("title=%q", title), '-y', out_path }
 
     mp.osd_message("开始切片 " .. out_path, 2)
@@ -519,6 +534,9 @@ local function bookmark_cut(remember_pos)
         default_item = default_item,
         submit = function(chapter_num)
             local chapter = chapters[chapter_num]
+            if not chapter then
+                return
+            end
             local start_time, end_time, title = parse_chapter(chapter)
             if not end_time then
                 mp.osd_message("该章节没有结束时间")
@@ -535,7 +553,7 @@ local function bookmark_cut(remember_pos)
                 ytdlp_cut(video_path, start_time, end_time, out_path, title)
             end
 
-            mp.add_timeout(0.1, function()
+            mp.add_timeout(0.01, function()
                 bookmark_cut(chapter_num)
             end)
         end,
