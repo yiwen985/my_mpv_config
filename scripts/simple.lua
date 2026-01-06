@@ -41,7 +41,7 @@ local function system_open(path)
     local platform = mp.get_property("platform")
     local args
     if platform == "windows" then
-        args = { "explorer", path }
+        args = { "rundll32", "url.dll,FileProtocolHandler", path }
     elseif platform == "darwin" then
         args = { "open", path }
     else
@@ -58,11 +58,7 @@ local function open_folder(path)
         mp.osd_message("无法打开文件夹" .. path)
         return
     end
-    -- print("path: " .. to_string(path))
-    -- print("info: " .. to_string(info))
-    -- print("split_path: " .. to_string(utils.split_path(path)))
     local folder = info.is_dir and path or utils.split_path(path)
-    -- print("folder: " .. to_string(folder))
     system_open(folder)
 end
 
