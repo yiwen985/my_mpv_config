@@ -57,7 +57,10 @@ local function mkdir(dir)
     end
 
     if not file_exists(dir) then
-        os.execute("mkdir " .. tool.escape_str(dir))
+        local cmd = "mkdir " .. tool.escape_str(dir)
+        print(cmd)
+        os.execute(cmd)
+        -- os.execute("mkdir " .. dir)
     end
     return dir
 end
@@ -262,6 +265,68 @@ local function bookmark_add_append()
     end
     local start_time, _, chapter_title = parse_chapter(chapters[pos])
     local default_text = start_time .. " " .. get_current_timestamp() .. " " .. chapter_title
+
+    input.get({
+        prompt = "修改书签（时间 标题）: ",
+        submit = function(text)
+            local item = parse_line(text)
+            table.remove(chapters, pos)
+            if item then
+                table.insert(chapters, item)
+                update_chapters(chapters)
+            end
+        end,
+        default_text = default_text
+    })
+end
+
+--- test cases
+---   - 01:40:19.546 01:43:42.694 [test_case_1] 少女作妖日记
+---   - 01:52:52.296 [test_case_2] 玫瑰花的葬礼
+---   - 01:56:55.292 [test_case_3] 02:00:58.164 庐州月
+---   - chapter_end  [test_case_4]
+---
+--- test cases results:
+---   - test_case_1: test_case_1.time 玫瑰花的葬礼
+---   - test_case_2: test_case_2.time 02:00:58.164 庐州月
+---   - test_case_3: test_case_3.time 02:00:58.164 庐州月
+---   - test_case_4: mp.osd_message("当前时间大于章节结束时间，且没有下一章节.", 3)
+local function bookmark_modify_start_time_ifcurrlowerthanendtime_else_modify_next_start_time()
+    local chapters = get_chapter_list()
+    local pos = get_current_chapter_pos_of_chapters()
+    if not chapters or not pos then
+        mp.add_timeout(0.01, bookmark_add)
+        return
+    end
+
+    if not chapters[pos] then
+        return
+    end
+    local _, end_time, chapter_title = parse_chapter(chapters[pos])
+    local curr = get_current_timestamp()
+
+    ------------------------- chatgpt start
+    -- 计算是否需要跳到下一章节
+    if not end_time or curr > end_time then
+        pos = pos + 1
+    end
+
+    -- 下一章节不存在
+    if not chapters[pos] then
+        mp.osd_message("当前时间大于章节结束时间，且没有下一章节.", 3)
+        return
+    end
+
+    -- 解析最终章节
+    _, end_time, chapter_title = parse_chapter(chapters[pos])
+
+    -- local default_text = get_current_timestamp() .. " " .. (end_time and (end_time .. " ") or "") .. chapter_title
+    local default_text = tool.concat_str({
+        get_current_timestamp(),
+        end_time,
+        chapter_title
+    }, " ")
+    ------------------------- chatgpt end
 
     input.get({
         prompt = "修改书签（时间 标题）: ",
@@ -545,6 +610,7 @@ local function bookmark_cut(remember_pos)
 
             local video_path = get_file_path()
             local clips_dir = mkdir("切片")
+            print(clips_dir)
             local out_path = utils.join_path(clips_dir, title .. "." .. ext)
 
             if tool.is_local_path(video_path) then
@@ -583,12 +649,17 @@ local function cut_ab_loop()
 end
 
 mp.add_key_binding("ctrl+z", "test_bookmark", function()
-    print(get_chapter_file_path())
+    local p = "\\\\DESKTOP-VV2JEB7\\bililiverecorder\\25746936-哇啦哇啦稀里哗啦\\2026.01\\01\\切片"
+    local cmd = "mkdir " .. p
+    print(cmd)
+    os.execute(cmd)
 end)
 mp.register_event("file-loaded", load_chapter_file)
 mp.add_key_binding(nil, "bookmark_select", bookmark_select)
 mp.add_key_binding(nil, "bookmark_add", bookmark_add)
 mp.add_key_binding(nil, "bookmark_add_append", bookmark_add_append)
+mp.add_key_binding(nil, "bookmark_modify_start_time",
+    bookmark_modify_start_time_ifcurrlowerthanendtime_else_modify_next_start_time)
 mp.add_key_binding(nil, "jump_to_chapter_end", jump_to_chapter_end)
 mp.add_key_binding(nil, "bookmark_remove", bookmark_remove)
 mp.add_key_binding(nil, "bookmark_modify", bookmark_modify)

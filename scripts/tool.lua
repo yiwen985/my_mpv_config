@@ -146,7 +146,21 @@ function tool.get_filestem(filepath)
 end
 
 function tool.escape_str(str)
-    return string.format("%q", str)
+    -- return string.format("%q", str)
+    return str
+end
+
+---remove nil from table
+---@param t table # { "param1", nil, "param2", name = "bob" }
+---@param sep string
+---@return string # param1 param2
+function tool.concat_str(t, sep)
+    for i = #t, 1, -1 do
+        if t[i] == nil then
+            table.remove(t, i)
+        end
+    end
+    return table.concat(t, sep)
 end
 
 return tool
