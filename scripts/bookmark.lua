@@ -538,7 +538,11 @@ local function ffmpeg_cut(video_path, start_time, end_time, out_path, title)
 
     out_path = tool.unique_filename(out_path)
     title = title or tool.get_filestem(out_path)
-    local command = { 'ffmpeg', '-v', 'error', '-ss', start_time, '-to', end_time, '-i', video_path, '-c:a', 'copy',
+    -- local command = { 'ffmpeg', '-v', 'error', '-ss', start_time, '-to', end_time, '-i', video_path, '-c:a', 'copy',
+    --     '-metadata', string.format("title=%q", title), '-y', out_path }
+
+    -- 快速分割
+    local command = { 'ffmpeg', '-v', 'error', '-ss', start_time, '-to', end_time, '-i', video_path, '-c', 'copy',
         '-metadata', string.format("title=%q", title), '-y', out_path }
 
     mp.osd_message("开始切片 " .. out_path, 2)
