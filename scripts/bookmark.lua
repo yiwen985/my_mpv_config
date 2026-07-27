@@ -632,11 +632,16 @@ end
 
 local function cut_ab_loop()
     local ab_loop_a = mp.get_property("ab-loop-a")
-    local ab_loop_b = mp.get_property("ab-loop-b")
-    if not ab_loop_a or not ab_loop_b then
-        mp.osd_message("没有设置 ab-loop-a 或 ab-loop-b")
+    if ab_loop_a == "no" then
+        -- mp.osd_message("没有设置 ab-loop-a 或 ab-loop-b")
+        mp.osd_message("没有设置 ab-loop-a")
         return
     end
+    local ab_loop_b = mp.get_property("ab-loop-b")
+    if ab_loop_b == "no" then
+        ab_loop_b = mp.get_property("duration")
+    end
+
 
     local ext = "mp4"
     local clips_dir = mkdir("切片")
